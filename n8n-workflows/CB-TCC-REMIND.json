@@ -1,0 +1,88 @@
+{
+  "name": "CB-TCC-REMIND",
+  "active": false,
+  "nodes": [
+    {
+      "name": "Schedule — Daily 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }] }
+      },
+      "position": [200, 300]
+    },
+    {
+      "name": "Airtable — Get Expiring TCCs",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Documents",
+        "filterByFormula": "AND({Doc Type} = 'TCC', {Status} != 'archived', IS_BEFORE({Expiry Date}, DATEADD(TODAY(), 31, 'days')), IS_AFTER({Expiry Date}, DATEADD(TODAY(), -1, 'days')))",
+        "maxRecords": 100
+      },
+      "position": [400, 300]
+    },
+    {
+      "name": "Loop Over Expiring TCCs",
+      "type": "n8n-nodes-base.splitInBatches",
+      "parameters": { "batchSize": 1 },
+      "position": [600, 300]
+    },
+    {
+      "name": "Calculate Days Until Expiry",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const expiry = new Date(items[0].json['Expiry Date']);\nconst today = new Date();\nconst days = Math.ceil((expiry - today) / (1000*60*60*24));\nitems[0].json.daysUntilExpiry = days;\nitems[0].json.urgency = days <= 7 ? 'URGENT' : days <= 14 ? 'HIGH' : 'REMINDER';\nreturn items;"
+      },
+      "position": [800, 300]
+    },
+    {
+      "name": "Email Client — TCC Expiry Warning",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "={{ $json['Client Email'] }}",
+        "subject": "{{ $json.urgency === 'URGENT' ? '⚠ URGENT: ' : '' }}Your Tax Clearance Certificate expires in {{ $json.daysUntilExpiry }} days",
+        "message": "Hi {{ $json['Client Name'] }},\n\nYour Tax Clearance Certificate (TCC) expires on {{ $json['Expiry Date'] }} — that is {{ $json.daysUntilExpiry }} days from today.\n\n{{ $json.urgency === 'URGENT' ? 'This is urgent. Please contact us immediately so we can prepare your renewal file.' : 'We are preparing your TCC readiness file now. Please ensure all your filings are current (VAT, NIB, business licence) as these affect TCC issuance.' }}\n\nA TCC is required for:\n- Government contracts and tenders\n- Collecting payment from government or public bodies\n- Certain ownership transfers and licences\n\nWe will be in touch shortly with a checklist of what is needed. If you have any questions, reply to this email.\n\nCurrent Bahamas\nhello@currentbahamas.com"
+      },
+      "position": [1000, 200]
+    },
+    {
+      "name": "Email Ops — TCC Alert",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "ops@currentbahamas.com",
+        "subject": "{{ $json.urgency }}: TCC expiry in {{ $json.daysUntilExpiry }} days — {{ $json['Client Name'] }}",
+        "message": "TCC expiry alert:\n\nClient: {{ $json['Client Name'] }}\nTCC Expiry: {{ $json['Expiry Date'] }}\nDays until expiry: {{ $json.daysUntilExpiry }}\nUrgency: {{ $json.urgency }}\n\nAction required:\n1. Check client's VAT, NIB, and business licence status\n2. Identify any arrears or missing documents\n3. Send client a TCC readiness checklist\n4. Create a TCC project task in Airtable if one doesn't exist\n\nClient has been notified via email."
+      },
+      "position": [1000, 400]
+    },
+    {
+      "name": "Airtable — Create TCC Project Task",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "create",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Projects",
+        "fields": {
+          "Name": "={{ $json['Client Name'] + ' — TCC Renewal ' + new Date().getFullYear() }}",
+          "Project Type": "TCC Rescue",
+          "Status": "scoped",
+          "Notes": "={{ 'Auto-created by CB-TCC-REMIND. TCC expires ' + $json['Expiry Date'] + ' (' + $json.daysUntilExpiry + ' days). Urgency: ' + $json.urgency }}"
+        }
+      },
+      "position": [1000, 600]
+    }
+  ],
+  "connections": {
+    "Schedule — Daily 8am": { "main": [[{ "node": "Airtable — Get Expiring TCCs" }]] },
+    "Airtable — Get Expiring TCCs": { "main": [[{ "node": "Loop Over Expiring TCCs" }]] },
+    "Loop Over Expiring TCCs": { "main": [[{ "node": "Calculate Days Until Expiry" }]] },
+    "Calculate Days Until Expiry": { "main": [[
+      { "node": "Email Client — TCC Expiry Warning" },
+      { "node": "Email Ops — TCC Alert" },
+      { "node": "Airtable — Create TCC Project Task" }
+    ]] }
+  },
+  "settings": { "saveDataSuccessExecution": "last" },
+  "tags": ["CB-", "P2"]
+}
