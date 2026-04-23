@@ -1,38 +1,15 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
+import { Mail, Clock, MessageSquare } from 'lucide-react'
 import { MarketingHeader, MarketingFooter } from '@/components/marketing/shared'
-import { Mail, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
+import { ContactBanner } from '@/components/marketing/ContactBanner'
 
-export const metadata: Metadata = { title: 'Contact' }
-
-// Success/error banners read from URL search params
-function Banner({ success, error }: { success: boolean; error: string | null }) {
-  if (success) return (
-    <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-      <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-      <div>
-        <p className="font-medium text-green-900 text-sm">Message sent</p>
-        <p className="text-green-700 text-xs mt-0.5">We will reply within 1 business day.</p>
-      </div>
-    </div>
-  )
-  if (error) return (
-    <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-      <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-      <div>
-        <p className="font-medium text-red-900 text-sm">
-          {error === 'missing' ? 'Please fill in all fields' : 'Something went wrong — please try again'}
-        </p>
-      </div>
-    </div>
-  )
-  return null
+export const metadata: Metadata = {
+  title: 'Contact',
+  description: 'Get in touch with Current Bahamas. Questions about compliance coordination, TCC readiness, or our services.',
 }
 
-export default function ContactPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ success?: string; error?: string }>
-}) {
+export default function ContactPage() {
   return (
     <div className="min-h-screen">
       <MarketingHeader />
@@ -47,9 +24,9 @@ export default function ContactPage({
       </section>
 
       <section className="py-16 px-6">
-        <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-10">
+        <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-10">
 
-          {/* Contact info */}
+          {/* Left sidebar */}
           <div className="space-y-6">
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-lg bg-[#EAF2F5] flex items-center justify-center shrink-0">
@@ -57,51 +34,63 @@ export default function ContactPage({
               </div>
               <div>
                 <p className="font-medium text-navy text-sm">Email</p>
-                <a href="mailto:hello@currentbahamas.com" className="text-sm text-[#1A6B72] hover:underline">
+                <a
+                  href="mailto:hello@currentbahamas.com"
+                  className="text-sm text-[#1A6B72] hover:underline"
+                >
                   hello@currentbahamas.com
                 </a>
               </div>
             </div>
+
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-lg bg-[#EAF2F5] flex items-center justify-center shrink-0">
                 <Clock className="h-4 w-4 text-[#1A6B72]" />
               </div>
               <div>
-                <p className="font-medium text-navy text-sm">Hours</p>
-                <p className="text-sm text-gray-500">Mon–Fri 9am–5pm</p>
-                <p className="text-sm text-gray-500">Bahamas Standard Time</p>
+                <p className="font-medium text-navy text-sm">Response time</p>
+                <p className="text-sm text-gray-500">Within 1 business day</p>
+                <p className="text-sm text-gray-500">Mon–Fri, 9am–5pm BST</p>
               </div>
             </div>
-            <div className="bg-[#EAF2F5] rounded-xl p-4">
-              <p className="text-xs font-medium text-navy mb-1">Ready to start?</p>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                If you want a full compliance review, use the intake form — it gives us what we need to help you right away.
-              </p>
-              <a href="/intake" className="inline-block mt-3 text-xs font-semibold text-[#1A6B72] hover:underline">
-                Book a review →
-              </a>
+
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[#EAF2F5] flex items-center justify-center shrink-0">
+                <MessageSquare className="h-4 w-4 text-[#1A6B72]" />
+              </div>
+              <div>
+                <p className="font-medium text-navy text-sm">Compliance review</p>
+                <p className="text-sm text-gray-500">
+                  Want a review of your situation?{' '}
+                  <a href="/intake" className="text-[#1A6B72] hover:underline">
+                    Use the intake form
+                  </a>
+                </p>
+              </div>
             </div>
           </div>
 
           {/* Form */}
           <div className="md:col-span-2 bg-white rounded-2xl border border-gray-200 p-7">
-            <h2 className="font-semibold text-navy mb-5">Send us a message</h2>
+            <h2 className="font-semibold text-navy text-lg mb-5">Send us a message</h2>
 
-            {/* Banner — resolved on server using searchParams */}
-            <ContactBanner />
+            {/* Banner reads ?success=true or ?error=X from URL — client component */}
+            <Suspense fallback={null}>
+              <ContactBanner />
+            </Suspense>
 
             <form action="/api/contact" method="POST" className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-navy mb-1.5">
-                    Full Name <span className="text-red-400">*</span>
+                    Full name <span className="text-red-400">*</span>
                   </label>
                   <input
                     name="name"
                     type="text"
                     required
                     autoComplete="name"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A6B72] focus:border-transparent"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A6B72]"
                   />
                 </div>
                 <div>
@@ -113,7 +102,7 @@ export default function ContactPage({
                     type="email"
                     required
                     autoComplete="email"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A6B72] focus:border-transparent"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A6B72]"
                   />
                 </div>
               </div>
@@ -130,10 +119,10 @@ export default function ContactPage({
                 >
                   <option value="" disabled>Select a topic…</option>
                   <option>Question about my compliance situation</option>
-                  <option>TCC readiness enquiry</option>
-                  <option>Monthly service enquiry</option>
+                  <option>TCC Readiness enquiry</option>
+                  <option>Monthly Compliance Care enquiry</option>
+                  <option>Full Compliance Operations enquiry</option>
                   <option>Exemption / concession packaging</option>
-                  <option>Import document prep</option>
                   <option>Something else</option>
                 </select>
               </div>
@@ -159,8 +148,9 @@ export default function ContactPage({
               </button>
 
               <p className="text-xs text-gray-400 text-center">
-                By submitting this form, you agree to our{' '}
+                By submitting this form you agree to our{' '}
                 <a href="/privacy" className="hover:underline text-[#1A6B72]">Privacy Notice</a>.
+                We do not share your data with third parties.
               </p>
             </form>
           </div>
@@ -170,13 +160,4 @@ export default function ContactPage({
       <MarketingFooter />
     </div>
   )
-}
-
-// Server component banner — reads searchParams
-async function ContactBanner() {
-  // In Next.js 15 App Router, searchParams is a Promise in server components
-  // We keep this simple: if ?success=true show green, if ?error=X show red
-  // The actual reading happens client-side via the URL
-  // For SSR we'd need to pass searchParams prop — placeholder for now
-  return null
 }
