@@ -1,0 +1,81 @@
+{
+  "name": "CB-MISSING-DOC",
+  "active": false,
+  "nodes": [
+    {
+      "name": "Schedule — Daily 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }] } },
+      "position": [200, 300]
+    },
+    {
+      "name": "Airtable — Get Missing Docs",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Documents",
+        "filterByFormula": "AND({Status} = 'missing', {Reminder Count} < 3)",
+        "maxRecords": 50
+      },
+      "position": [400, 300]
+    },
+    {
+      "name": "Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "parameters": { "batchSize": 1 },
+      "position": [600, 300]
+    },
+    {
+      "name": "Email Client — Request Document",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "={{ $json['Client Email'] }}",
+        "subject": "Document needed: {{ $json['Doc Type'] }}",
+        "message": "Hi {{ $json['Client Name'] }},\n\nWe are missing the following document for your compliance file:\n\n{{ $json['Doc Type'] }}\n\nPlease upload it to your Google Drive folder or reply to this email with the document attached.\n\nIf you have questions about what this document should contain, reply and we will clarify.\n\nCurrent Bahamas"
+      },
+      "position": [800, 200]
+    },
+    {
+      "name": "Airtable — Increment Reminder Count",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "update",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Documents",
+        "id": "={{ $json.id }}",
+        "fields": { "Reminder Count": "={{ ($json['Reminder Count'] || 0) + 1 }}", "Last Reminded": "={{ new Date().toISOString().split('T')[0] }}" }
+      },
+      "position": [800, 400]
+    },
+    {
+      "name": "Check — 3rd Reminder (Ops Alert)",
+      "type": "n8n-nodes-base.filter",
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ $json['Reminder Count'] }}", "operation": "equals", "value2": 2 }]
+        }
+      },
+      "position": [1000, 300]
+    },
+    {
+      "name": "Email Ops — No Response After 3",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "ops@currentbahamas.com",
+        "subject": "No response after 3 reminders: {{ $json['Client Name'] }} — {{ $json['Doc Type'] }}",
+        "message": "Client has not responded after 3 document reminders:\n\nClient: {{ $json['Client Name'] }}\nDocument: {{ $json['Doc Type'] }}\nLast reminded: {{ $json['Last Reminded'] }}\n\nManual follow-up required."
+      },
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "Schedule — Daily 9am": { "main": [[{ "node": "Airtable — Get Missing Docs" }]] },
+    "Airtable — Get Missing Docs": { "main": [[{ "node": "Loop" }]] },
+    "Loop": { "main": [[{ "node": "Email Client — Request Document" }, { "node": "Airtable — Increment Reminder Count" }]] },
+    "Airtable — Increment Reminder Count": { "main": [[{ "node": "Check — 3rd Reminder (Ops Alert)" }]] },
+    "Check — 3rd Reminder (Ops Alert)": { "main": [[{ "node": "Email Ops — No Response After 3" }]] }
+  },
+  "settings": { "saveDataSuccessExecution": "last" },
+  "tags": ["CB-", "P1"]
+}

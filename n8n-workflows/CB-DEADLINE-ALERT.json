@@ -1,0 +1,80 @@
+{
+  "name": "CB-DEADLINE-ALERT",
+  "active": false,
+  "nodes": [
+    {
+      "name": "Schedule — Daily 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }] } },
+      "position": [200, 300]
+    },
+    {
+      "name": "Airtable — Get At-Risk Items",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Compliance Items",
+        "filterByFormula": "AND(IS_BEFORE(TODAY(), DATEADD({Due Date}, 1, 'days')), IS_AFTER({Due Date}, DATEADD(TODAY(), -1, 'days')), {Status} != 'Complete')",
+        "maxRecords": 100
+      },
+      "position": [400, 300]
+    },
+    {
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "parameters": { "batchSize": 1 },
+      "position": [600, 300]
+    },
+    {
+      "name": "Check — Due in 14 days or less",
+      "type": "n8n-nodes-base.filter",
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ Math.ceil((new Date($json['Due Date']) - new Date()) / (1000*60*60*24)) }}", "operation": "smallerEqual", "value2": 14 }]
+        }
+      },
+      "position": [800, 300]
+    },
+    {
+      "name": "Email Client",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "={{ $json['Client Email'] }}",
+        "subject": "Action needed: {{ $json['Item Type'] }} due {{ $json['Due Date'] }}",
+        "message": "Hi {{ $json['Client Name'] }},\n\nThis is a reminder that your {{ $json['Item Type'] }} is due on {{ $json['Due Date'] }}.\n\nStatus: {{ $json.Status }}\n\nPlease send us any missing documents so we can prepare. Reply to this email or WhatsApp us.\n\nCurrent Bahamas"
+      },
+      "position": [1000, 200]
+    },
+    {
+      "name": "Email Ops Alert",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "ops@currentbahamas.com",
+        "subject": "⚠ Deadline in {{ $json.DaysOut }} days: {{ $json['Client Name'] }} — {{ $json['Item Type'] }}",
+        "message": "At-risk item:\n\nClient: {{ $json['Client Name'] }}\nItem: {{ $json['Item Type'] }}\nDue: {{ $json['Due Date'] }}\nStatus: {{ $json.Status }}\n\nClient has been notified."
+      },
+      "position": [1000, 400]
+    },
+    {
+      "name": "Airtable — Update Status to At-Risk",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "update",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Compliance Items",
+        "id": "={{ $json.id }}",
+        "fields": { "Status": "at-risk" }
+      },
+      "position": [1000, 600]
+    }
+  ],
+  "connections": {
+    "Schedule — Daily 8am": { "main": [[{ "node": "Airtable — Get At-Risk Items" }]] },
+    "Airtable — Get At-Risk Items": { "main": [[{ "node": "Loop Over Items" }]] },
+    "Loop Over Items": { "main": [[{ "node": "Check — Due in 14 days or less" }]] },
+    "Check — Due in 14 days or less": { "main": [[{ "node": "Email Client" }, { "node": "Email Ops Alert" }, { "node": "Airtable — Update Status to At-Risk" }]] }
+  },
+  "settings": { "saveDataSuccessExecution": "last" },
+  "tags": ["CB-", "P1"]
+}

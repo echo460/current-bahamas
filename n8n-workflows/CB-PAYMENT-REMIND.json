@@ -1,0 +1,93 @@
+{
+  "name": "CB-PAYMENT-REMIND",
+  "active": false,
+  "nodes": [
+    {
+      "name": "Schedule — Daily 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }] } },
+      "position": [200, 300]
+    },
+    {
+      "name": "Airtable — Get Pending Payments",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Payments",
+        "filterByFormula": "AND({Status} = 'pending', {Due Date} != '')",
+        "maxRecords": 50
+      },
+      "position": [400, 300]
+    },
+    {
+      "name": "Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "parameters": { "batchSize": 1 },
+      "position": [600, 300]
+    },
+    {
+      "name": "Calculate Days Until Due",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const dueDate = new Date(items[0].json['Due Date']);\nconst today = new Date();\nconst daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));\nitems[0].json.daysUntilDue = daysUntil;\nreturn items;"
+      },
+      "position": [800, 300]
+    },
+    {
+      "name": "Route by Days",
+      "type": "n8n-nodes-base.switch",
+      "parameters": {
+        "dataType": "number",
+        "value1": "={{ $json.daysUntilDue }}",
+        "rules": {
+          "rules": [
+            { "operation": "equals", "value2": 3, "output": 0 },
+            { "operation": "equals", "value2": 0, "output": 1 },
+            { "operation": "smallerEqual", "value2": -3, "output": 2 }
+          ]
+        }
+      },
+      "position": [1000, 300]
+    },
+    {
+      "name": "Email — 3 Days Before",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "={{ $json['Client Email'] }}",
+        "subject": "Payment due in 3 days — Invoice {{ $json['Invoice Number'] }}",
+        "message": "Hi {{ $json['Client Name'] }},\n\nThis is a reminder that invoice {{ $json['Invoice Number'] }} for ${{ $json.Amount }} is due on {{ $json['Due Date'] }}.\n\nPayment by bank transfer to the details on your invoice. Reply if you have questions.\n\nCurrent Bahamas"
+      },
+      "position": [1200, 100]
+    },
+    {
+      "name": "Email — Due Today",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "={{ $json['Client Email'] }}",
+        "subject": "Payment due today — Invoice {{ $json['Invoice Number'] }}",
+        "message": "Hi {{ $json['Client Name'] }},\n\nInvoice {{ $json['Invoice Number'] }} for ${{ $json.Amount }} is due today.\n\nPlease arrange payment at your earliest convenience. Reply if you have questions.\n\nCurrent Bahamas"
+      },
+      "position": [1200, 300]
+    },
+    {
+      "name": "Email Ops — 3 Days Overdue",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "ops@currentbahamas.com",
+        "subject": "OVERDUE: {{ $json['Client Name'] }} — Invoice {{ $json['Invoice Number'] }} (${{ $json.Amount }})",
+        "message": "Payment overdue by 3+ days:\n\nClient: {{ $json['Client Name'] }}\nInvoice: {{ $json['Invoice Number'] }}\nAmount: ${{ $json.Amount }}\nDue: {{ $json['Due Date'] }}\n\nManual follow-up required. Consider calling client directly."
+      },
+      "position": [1200, 500]
+    }
+  ],
+  "connections": {
+    "Schedule — Daily 8am": { "main": [[{ "node": "Airtable — Get Pending Payments" }]] },
+    "Airtable — Get Pending Payments": { "main": [[{ "node": "Loop" }]] },
+    "Loop": { "main": [[{ "node": "Calculate Days Until Due" }]] },
+    "Calculate Days Until Due": { "main": [[{ "node": "Route by Days" }]] },
+    "Route by Days": { "main": [[{ "node": "Email — 3 Days Before" }], [{ "node": "Email — Due Today" }], [{ "node": "Email Ops — 3 Days Overdue" }]] }
+  },
+  "settings": { "saveDataSuccessExecution": "last" },
+  "tags": ["CB-", "P1"]
+}

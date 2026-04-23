@@ -1,0 +1,63 @@
+{
+  "name": "CB-STATUS-DIGEST",
+  "active": false,
+  "nodes": [
+    {
+      "name": "Schedule — Monday 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 8 * * 1" }] } },
+      "position": [200, 300]
+    },
+    {
+      "name": "Airtable — Get At-Risk Items",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Compliance Items",
+        "filterByFormula": "OR({Status} = 'at-risk', {Status} = 'overdue')",
+        "sort": [{ "field": "Due Date", "direction": "asc" }],
+        "maxRecords": 100
+      },
+      "position": [400, 200]
+    },
+    {
+      "name": "Airtable — Get Missing Docs",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Documents",
+        "filterByFormula": "{Status} = 'missing'",
+        "maxRecords": 100
+      },
+      "position": [400, 400]
+    },
+    {
+      "name": "Build Digest",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const atRisk = $('Airtable — Get At-Risk Items').all();\nconst missing = $('Airtable — Get Missing Docs').all();\n\nlet body = `Weekly Compliance Digest — ${new Date().toDateString()}\\n\\n`;\n\nbody += `AT-RISK / OVERDUE ITEMS: ${atRisk.length}\\n`;\natRisk.forEach(i => {\n  body += `  • ${i.json['Client Name']} — ${i.json['Item Type']} (due ${i.json['Due Date']}) [${i.json.Status}]\\n`;\n});\n\nbody += `\\nMISSING DOCUMENTS: ${missing.length}\\n`;\nmissing.forEach(d => {\n  body += `  • ${d.json['Client Name']} — ${d.json['Doc Type']} (${d.json['Reminder Count'] || 0} reminders sent)\\n`;\n});\n\nbody += `\\nAirtable: https://airtable.com`;\n\nreturn [{ json: { body, atRiskCount: atRisk.length, missingCount: missing.length } }];"
+      },
+      "position": [600, 300]
+    },
+    {
+      "name": "Email Ops Digest",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "ops@currentbahamas.com",
+        "subject": "Weekly digest: {{ $json.atRiskCount }} at-risk, {{ $json.missingCount }} missing docs",
+        "message": "={{ $json.body }}"
+      },
+      "position": [800, 300]
+    }
+  ],
+  "connections": {
+    "Schedule — Monday 8am": { "main": [[{ "node": "Airtable — Get At-Risk Items" }, { "node": "Airtable — Get Missing Docs" }]] },
+    "Airtable — Get At-Risk Items": { "main": [[{ "node": "Build Digest" }]] },
+    "Airtable — Get Missing Docs": { "main": [[{ "node": "Build Digest" }]] },
+    "Build Digest": { "main": [[{ "node": "Email Ops Digest" }]] }
+  },
+  "settings": { "saveDataSuccessExecution": "last" },
+  "tags": ["CB-", "P1"]
+}

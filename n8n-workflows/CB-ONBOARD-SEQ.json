@@ -1,0 +1,52 @@
+{
+  "name": "CB-ONBOARD-SEQ",
+  "active": false,
+  "nodes": [
+    {
+      "name": "Airtable Trigger — New Client",
+      "type": "n8n-nodes-base.airtableTrigger",
+      "parameters": {
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Clients",
+        "event": "recordCreated"
+      },
+      "position": [200, 300]
+    },
+    {
+      "name": "Filter — External Clients Only",
+      "type": "n8n-nodes-base.filter",
+      "parameters": {
+        "conditions": {
+          "string": [{ "value1": "={{ $json['external/internal flag'] }}", "operation": "equals", "value2": "external" }]
+        }
+      },
+      "position": [400, 300]
+    },
+    {
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "={{ $json.Email }}",
+        "subject": "Welcome to Current Bahamas — next steps",
+        "message": "Hi {{ $json['Contact Name'] }},\n\nWelcome to Current Bahamas. Here is what happens next:\n\n1. We will review your compliance status and send you a first snapshot within 5 business days.\n2. Your documents should go into the shared Google Drive folder (link coming separately).\n3. Any questions — reply to this email or WhatsApp us.\n\nStay current,\nCurrent Bahamas\nhello@currentbahamas.com"
+      },
+      "position": [600, 200]
+    },
+    {
+      "name": "Email Alert to Ops",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "ops@currentbahamas.com",
+        "subject": "New client onboarded: {{ $json['Business Name'] }}",
+        "message": "New client added:\n\nBusiness: {{ $json['Business Name'] }}\nTier: {{ $json.Tier }}\nContact: {{ $json['Contact Name'] }} — {{ $json.Email }}\nIsland: {{ $json.Island }}\n\nAction: Create Drive folder and send intake checklist."
+      },
+      "position": [600, 400]
+    }
+  ],
+  "connections": {
+    "Airtable Trigger — New Client": { "main": [[{ "node": "Filter — External Clients Only" }]] },
+    "Filter — External Clients Only": { "main": [[{ "node": "Send Welcome Email" }, { "node": "Email Alert to Ops" }]] }
+  },
+  "settings": { "saveDataSuccessExecution": "last", "saveManualExecutions": true },
+  "tags": ["CB-", "P1"]
+}
