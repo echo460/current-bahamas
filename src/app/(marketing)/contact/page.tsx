@@ -50,7 +50,7 @@ export default function ContactPage() {
               <div>
                 <p className="font-medium text-navy text-sm">Response time</p>
                 <p className="text-sm text-gray-500">Within 1 business day</p>
-                <p className="text-sm text-gray-500">Mon–Fri, 9am–5pm BST</p>
+                <p className="text-sm text-gray-500">Mon–Fri, 9am–5pm EST</p>
               </div>
             </div>
 
