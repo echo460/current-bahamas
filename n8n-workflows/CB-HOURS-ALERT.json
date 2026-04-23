@@ -1,0 +1,80 @@
+{
+  "name": "CB-HOURS-ALERT",
+  "active": false,
+  "nodes": [
+    {
+      "name": "Schedule — Last Day of Month",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 8 28-31 * *" }]
+        }
+      },
+      "position": [200, 300]
+    },
+    {
+      "name": "Check Last Day of Month",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst tomorrow = new Date(now);\ntomorrow.setDate(now.getDate() + 1);\n// Only proceed if tomorrow is the 1st (i.e., today is last day of month)\nif (tomorrow.getDate() !== 1) {\n  return []; // Stop execution\n}\nreturn [{ json: { month: now.toLocaleString('en', { month: 'long' }), year: now.getFullYear() } }];"
+      },
+      "position": [400, 300]
+    },
+    {
+      "name": "Get Active External Clients",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Clients",
+        "filterByFormula": "AND({Status} = 'active', {External/Internal} = 'external')",
+        "maxRecords": 100
+      },
+      "position": [600, 300]
+    },
+    {
+      "name": "Loop Over Clients",
+      "type": "n8n-nodes-base.splitInBatches",
+      "parameters": { "batchSize": 1 },
+      "position": [800, 300]
+    },
+    {
+      "name": "Calculate Budget vs Actual",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const client = items[0].json;\nconst tier = client['Tier'] || 'T1';\nconst budgets = { 'T1': 4, 'T2': 10, 'T3': 22 };\nconst ceilings = { 'T1': 5.5, 'T2': 13, 'T3': 27 };\nconst budget = budgets[tier] || 4;\nconst ceiling = ceilings[tier] || 5.5;\nconst actual = parseFloat(client['Hours This Month'] || 0);\nconst pct = budget > 0 ? Math.round((actual / budget) * 100) : 0;\nitems[0].json.hoursBudget = budget;\nitems[0].json.hoursCeiling = ceiling;\nitems[0].json.hoursActual = actual;\nitems[0].json.hoursPercent = pct;\nitems[0].json.overBudget = actual > budget;\nitems[0].json.overCeiling = actual > ceiling;\nitems[0].json.flag = actual > budget * 1.1; // Flag at 110% of budget\nreturn items;"
+      },
+      "position": [1000, 300]
+    },
+    {
+      "name": "Filter — Over 110% of Budget",
+      "type": "n8n-nodes-base.filter",
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.flag }}", "operation": "true" }]
+        }
+      },
+      "position": [1200, 300]
+    },
+    {
+      "name": "Email Ops — Hours Alert",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "ops@currentbahamas.com",
+        "subject": "Hours alert: {{ $json['Business Name'] }} at {{ $json.hoursPercent }}% of budget ({{ $json['Tier'] }})",
+        "message": "Client hours review for {{ $json.month }} {{ $json.year }}:\n\nClient: {{ $json['Business Name'] }}\nTier: {{ $json['Tier'] }}\nBudget: {{ $json.hoursBudget }} hrs\nCeiling: {{ $json.hoursCeiling }} hrs\nActual: {{ $json.hoursActual }} hrs ({{ $json.hoursPercent }}% of budget)\n{{ $json.overCeiling ? 'STATUS: OVER CEILING — overage billing required' : 'STATUS: Over budget but under ceiling — review required' }}\n\nActions:\n- If hours > ceiling: prepare overage invoice ($85/hr above ceiling)\n- Consider whether client should be re-tiered\n- Review what drove the extra hours this month\n\nAirtable: https://airtable.com"
+      },
+      "position": [1400, 300]
+    }
+  ],
+  "connections": {
+    "Schedule — Last Day of Month": { "main": [[{ "node": "Check Last Day of Month" }]] },
+    "Check Last Day of Month": { "main": [[{ "node": "Get Active External Clients" }]] },
+    "Get Active External Clients": { "main": [[{ "node": "Loop Over Clients" }]] },
+    "Loop Over Clients": { "main": [[{ "node": "Calculate Budget vs Actual" }]] },
+    "Calculate Budget vs Actual": { "main": [[{ "node": "Filter — Over 110% of Budget" }]] },
+    "Filter — Over 110% of Budget": { "main": [[{ "node": "Email Ops — Hours Alert" }]] }
+  },
+  "settings": { "saveDataSuccessExecution": "last" },
+  "tags": ["CB-", "P2"]
+}

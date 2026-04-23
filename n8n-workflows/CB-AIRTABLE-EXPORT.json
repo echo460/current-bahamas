@@ -1,0 +1,126 @@
+{
+  "name": "CB-AIRTABLE-EXPORT",
+  "active": false,
+  "nodes": [
+    {
+      "name": "Schedule — Sunday 11pm",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 23 * * 0" }]
+        }
+      },
+      "position": [200, 300]
+    },
+    {
+      "name": "Build Date Folder Name",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const d = new Date();\nconst dateStr = d.toISOString().split('T')[0];\nreturn [{ json: { dateFolder: dateStr, timestamp: d.toISOString() } }];"
+      },
+      "position": [400, 300]
+    },
+    {
+      "name": "Export Clients",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Clients",
+        "maxRecords": 1000
+      },
+      "position": [600, 100]
+    },
+    {
+      "name": "Export Compliance Items",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Compliance Items",
+        "maxRecords": 5000
+      },
+      "position": [600, 250]
+    },
+    {
+      "name": "Export Documents",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Documents",
+        "maxRecords": 5000
+      },
+      "position": [600, 400]
+    },
+    {
+      "name": "Export Hours Log",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Hours Log",
+        "maxRecords": 10000
+      },
+      "position": [600, 550]
+    },
+    {
+      "name": "Export Payments",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "list",
+        "baseId": "{{ $env.AIRTABLE_BASE_ID }}",
+        "tableId": "Payments",
+        "maxRecords": 5000
+      },
+      "position": [600, 700]
+    },
+    {
+      "name": "Convert Clients to CSV",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "parameters": {
+        "operation": "toFile",
+        "fileFormat": "csv",
+        "options": {}
+      },
+      "position": [800, 100]
+    },
+    {
+      "name": "Upload Clients CSV to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "parameters": {
+        "operation": "upload",
+        "name": "=Clients_{{ $('Build Date Folder Name').item.json.dateFolder }}.csv",
+        "parents": ["CB-Backups/Airtable/{{ $('Build Date Folder Name').item.json.dateFolder }}"],
+        "driveId": "root"
+      },
+      "position": [1000, 100]
+    },
+    {
+      "name": "Email Ops — Backup Complete",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "to": "ops@currentbahamas.com",
+        "subject": "Weekly Airtable backup complete — {{ $('Build Date Folder Name').item.json.dateFolder }}",
+        "message": "Weekly Airtable export completed successfully.\n\nDate: {{ $('Build Date Folder Name').item.json.dateFolder }}\nLocation: Google Drive → CB-Backups/Airtable/{{ $('Build Date Folder Name').item.json.dateFolder }}/\n\nTables exported:\n- Clients\n- Compliance Items\n- Documents\n- Hours Log\n- Payments\n\nIf you do not receive this email, the backup failed. Check n8n workflow logs."
+      },
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "Schedule — Sunday 11pm": { "main": [[{ "node": "Build Date Folder Name" }]] },
+    "Build Date Folder Name": { "main": [[
+      { "node": "Export Clients" },
+      { "node": "Export Compliance Items" },
+      { "node": "Export Documents" },
+      { "node": "Export Hours Log" },
+      { "node": "Export Payments" }
+    ]] },
+    "Export Clients": { "main": [[{ "node": "Convert Clients to CSV" }]] },
+    "Convert Clients to CSV": { "main": [[{ "node": "Upload Clients CSV to Drive" }]] },
+    "Upload Clients CSV to Drive": { "main": [[{ "node": "Email Ops — Backup Complete" }]] }
+  },
+  "notes": "IMPORTANT: Activate AFTER all other P1 workflows are tested. Must be active before second external client is onboarded (v5 gate A6). Full implementation needs separate Convert+Upload nodes for each table — this stub shows the pattern; replicate for Compliance Items, Documents, Hours Log, Payments.",
+  "settings": { "saveDataSuccessExecution": "last" },
+  "tags": ["CB-", "P2"]
+}
