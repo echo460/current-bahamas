@@ -14,7 +14,7 @@ const obligations = [
 
 const steps = [
   { n: '1', title: 'Compliance Review', body: 'We look at your current setup — deadlines, documents, outstanding items, and risk points.' },
-  { n: '2', title: 'Map & Organise', body: 'We build a clear picture of what is current, what is at risk, and what is missing.' },
+  { n: '2', title: 'Build Your Calendar', body: 'We set up your compliance calendar and document vault — every deadline mapped, every document tracked, nothing left to chance.' },
   { n: '3', title: 'Ongoing Support', body: 'We stay involved month-to-month — reminders, document gathering, status tracking, deadline prep.' },
 ]
 
@@ -48,7 +48,7 @@ export default function HomePage() {
               href="/services"
               className="border border-[#0B2545] text-[#0B2545] font-semibold px-8 py-3.5 rounded-xl hover:bg-[#0B2545] hover:text-white transition-colors text-base"
             >
-              See Services
+              See Pricing
             </Link>
           </div>
         </div>
@@ -154,6 +154,44 @@ export default function HomePage() {
                 <p className="font-semibold text-navy text-sm mb-1">{name}</p>
                 <p className="text-xs text-gray-400 mb-2">{pain}</p>
                 <span className="text-xs font-medium text-[#1A6B72] bg-[#EAF2F5] px-2 py-0.5 rounded">{tiers}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="py-20 px-6 bg-cream">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-navy mb-3">Common questions</h2>
+          </div>
+          <div className="space-y-4">
+            {[
+              {
+                q: 'Do I still need an accountant?',
+                a: 'Yes. Current Bahamas is not an accounting firm. We handle the coordination layer — calendars, document organisation, deadline tracking, TCC readiness. Your accountant handles statutory filings and financial statements. We work alongside them, not instead of them.',
+              },
+              {
+                q: 'Can you submit things to the government on my behalf?',
+                a: 'We prepare everything so it is ready to submit. For most workflows the default is that you (or your accountant) submit. In some cases we can assist with submission, but only when the portal\'s own rules and your written authorisation are both confirmed. We are not a licensed customs broker or immigration adviser.',
+              },
+              {
+                q: 'What happens if I miss a deadline?',
+                a: "That's exactly what we prevent. Our job is to make sure you know what's coming at least two weeks before it's due. If something slips despite that, we help you understand what the exposure is and what to do next.",
+              },
+              {
+                q: 'How is this different from a bookkeeper?',
+                a: 'A bookkeeper records transactions. We manage your compliance calendar, keep your documents organised, maintain your TCC readiness, and track every government-facing obligation your business has. Most bookkeepers don\'t do this proactively.',
+              },
+              {
+                q: 'How do I get started?',
+                a: 'Book a free compliance review. We look at your current situation, tell you what\'s current, what\'s at risk, and what needs attention first. No commitment required.',
+              },
+            ].map(({ q, a }) => (
+              <div key={q} className="bg-white rounded-xl p-6 border border-gray-100">
+                <p className="font-semibold text-navy mb-2 text-sm">{q}</p>
+                <p className="text-sm text-gray-500 leading-relaxed">{a}</p>
               </div>
             ))}
           </div>

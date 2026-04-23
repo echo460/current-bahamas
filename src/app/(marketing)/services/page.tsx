@@ -155,6 +155,22 @@ export default function ServicesPage() {
         </div>
       </section>
 
+      {/* CTA */}
+      <section className="py-14 px-6 bg-[#0B2545] text-white text-center">
+        <div className="max-w-xl mx-auto">
+          <h2 className="text-2xl font-bold mb-3">Not sure which tier is right for you?</h2>
+          <p className="text-white/70 mb-6 text-sm">
+            Book a free compliance review. We look at your situation and tell you honestly what you need.
+          </p>
+          <Link
+            href="/intake"
+            className="inline-block bg-[#1A6B72] text-white font-semibold px-8 py-3 rounded-xl hover:bg-[#155a60] transition-colors"
+          >
+            Book a Free Compliance Review
+          </Link>
+        </div>
+      </section>
+
       <MarketingFooter />
     </div>
   )
